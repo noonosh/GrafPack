@@ -24,6 +24,7 @@ namespace GrafPack
             this.DoubleBuffered = true;
             isDragging = false;
             lastMousePosition = new Point();
+            this.WindowState = FormWindowState.Maximized;
         }
 
         private void SetupMainMenu()
@@ -44,6 +45,8 @@ namespace GrafPack
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
+            base.OnMouseDown(e);
+
             if (isCreateMode)
             {
                 startPoint = e.Location;
@@ -65,18 +68,25 @@ namespace GrafPack
                         selectedShape = shape;
                         selectedShape.IsSelected = true; // Highlight the newly selected shape
                         shapeFound = true;
+
+                        // Prepare to move immediately without needing to select "Move" from the menu
+                        lastMousePosition = e.Location;
+                        isDragging = true;
+                        this.MouseDown += OnMouseDownStartDrag;
+                        this.MouseMove += OnMouseMoveDrag;
+                        this.MouseUp += OnMouseUpEndDrag;
                         break;
                     }
                 }
                 if (!shapeFound && selectedShape != null)
                 {
-                    // If no new shape was found and there was a previously selected shape, deselect it
                     selectedShape.IsSelected = false;
                     selectedShape = null;
                 }
-                Invalidate(); // Redraw to reflect selection changes
+                Invalidate();
             }
         }
+
 
 
         private void OnMouseMoveCreateShape(object sender, MouseEventArgs e)
@@ -105,24 +115,25 @@ namespace GrafPack
             }
         }
 
+        /////////////////////////////////////////////////////////////////////
+
         private void StartMove()
         {
-            // If the selectedShape is already set, enable dragging immediately
             if (selectedShape != null)
             {
-                // Subscribe to mouse events for dragging
-                this.MouseDown += OnMouseDownStartDrag;
-                this.MouseMove += OnMouseMoveDrag;
-                this.MouseUp += OnMouseUpEndDrag;
+                MessageBox.Show("You can now drag the selected shape to move it.", "Move", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                MessageBox.Show("No shape selected to move. Please select a shape first.", "Move Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
         private void OnMouseDownStartDrag(object sender, MouseEventArgs e)
         {
-            // If the mouse is down over the selected shape, begin drag
-            if (selectedShape.ContainsPoint(e.Location))
+            // Already set up in the OnMouseDown, ensure we're over the selected shape
+            if (selectedShape != null && selectedShape.ContainsPoint(e.Location) && !isDragging)
             {
-                // Capture the start point of the drag
                 lastMousePosition = e.Location;
                 isDragging = true;
             }
@@ -130,33 +141,31 @@ namespace GrafPack
 
         private void OnMouseMoveDrag(object sender, MouseEventArgs e)
         {
-            // If dragging, update the shape's position
             if (isDragging && selectedShape != null)
             {
                 int dx = e.X - lastMousePosition.X;
                 int dy = e.Y - lastMousePosition.Y;
-
-                // Move the shape
                 selectedShape.Move(dx, dy);
-
-                // Update lastMousePosition
                 lastMousePosition = e.Location;
-
-                // Redraw the form
-                this.Invalidate();
+                Invalidate();
             }
         }
 
         private void OnMouseUpEndDrag(object sender, MouseEventArgs e)
         {
-            // End dragging
-            isDragging = false;
-
-            // Unsubscribe from mouse events
-            this.MouseDown -= OnMouseDownStartDrag;
-            this.MouseMove -= OnMouseMoveDrag;
-            this.MouseUp -= OnMouseUpEndDrag;
+            if (isDragging)
+            {
+                isDragging = false;
+                this.MouseDown -= OnMouseDownStartDrag;
+                this.MouseMove -= OnMouseMoveDrag;
+                this.MouseUp -= OnMouseUpEndDrag;
+                Invalidate();
+            }
         }
+
+
+        /////////////////////////////////////////////////////////////////////
+
 
 
         private void StartRotate()
