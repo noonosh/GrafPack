@@ -9,137 +9,179 @@ namespace GrafPack
     {
         private List<Shape> shapes = new List<Shape>();
         private Shape selectedShape;
-        private Point startPoint; // Used for rubber-banding and moving shapes
+        private Point lastMousePosition; // Store the last mouse position for dragging
+        private bool isDragging;
+        private Shape tempShape; // Temporary shape for dynamic creation
         private MainMenu mainMenu;
+        private bool isCreateMode = false;
+        private Type shapeToCreate;
+        private Point startPoint;
 
         public GrafPackApplication()
         {
             InitializeComponent();
             SetupMainMenu();
+            this.DoubleBuffered = true;
+            isDragging = false;
+            lastMousePosition = new Point();
         }
 
         private void SetupMainMenu()
         {
             mainMenu = new MainMenu();
-            MenuItem createItem = new MenuItem("Create");
-            createItem.MenuItems.Add("Square", (s, e) => StartShapeCreation(typeof(Square)));
-            //createItem.MenuItems.Add("Triangle", (s, e) => StartShapeCreation(typeof(Triangle)));
-            //createItem.MenuItems.Add("Circle", (s, e) => StartShapeCreation(typeof(Circle)));
-
-            MenuItem selectItem = new MenuItem("Select", SelectShape);
-
-            MenuItem transformItem = new MenuItem("Transform");
-            transformItem.MenuItems.Add("Move", (s, e) => StartMove());
-            transformItem.MenuItems.Add("Rotate", (s, e) => StartRotate());
-
-            MenuItem deleteItem = new MenuItem("Delete", DeleteShape);
-
-            MenuItem exitItem = new MenuItem("Exit", (s, e) => Close());
-
+            var createItem = new MenuItem("Create");
+            createItem.MenuItems.Add("Square", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Square); });
+            createItem.MenuItems.Add("Circle", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Circle); });
             mainMenu.MenuItems.Add(createItem);
-            mainMenu.MenuItems.Add(selectItem);
-            mainMenu.MenuItems.Add(transformItem);
+            mainMenu.MenuItems.Add("Select", (s, e) => isCreateMode = false);
+            mainMenu.MenuItems.Add("Move", (s, e) => StartMove());
+            mainMenu.MenuItems.Add("Rotate", (s, e) => StartRotate());
+            MenuItem deleteItem = new MenuItem("Delete", (s, e) => DeleteSelectedShape());
+            mainMenu.MenuItems.Add("Exit", (s, e) => Close());
             mainMenu.MenuItems.Add(deleteItem);
-            mainMenu.MenuItems.Add(exitItem);
-
             this.Menu = mainMenu;
         }
 
-        private void StartShapeCreation(Type shapeType)
+        protected override void OnMouseDown(MouseEventArgs e)
         {
-            MessageBox.Show($"Click to start creating a {shapeType.Name}");
-            this.MouseDown += (s, args) => // Changed from sender, e to s, args
+            if (isCreateMode)
             {
-                startPoint = args.Location;
-                this.MouseUp += OnMouseUpCreateShape;
-            };
-        }
-
-        private void SelectShape(object sender, EventArgs e)
-        {
-            MessageBox.Show("Click a shape to select it.");
-            this.MouseDown += (s, args) => // Changed from sender, e to s, args
+                startPoint = e.Location;
+                tempShape = ShapeFactory.CreateShape(shapeToCreate, startPoint);
+                this.MouseMove += OnMouseMoveCreateShape;
+                this.MouseUp += OnMouseUpFinalizeShape;
+            }
+            else
             {
+                bool shapeFound = false;
                 foreach (var shape in shapes)
                 {
-                    if (shape.ContainsPoint(args.Location))
+                    if (shape.ContainsPoint(e.Location))
                     {
+                        if (selectedShape != null)
+                        {
+                            selectedShape.IsSelected = false; // Deselect the previously selected shape
+                        }
                         selectedShape = shape;
+                        selectedShape.IsSelected = true; // Highlight the newly selected shape
+                        shapeFound = true;
                         break;
                     }
                 }
-                HighlightSelectedShape();
-            };
+                if (!shapeFound && selectedShape != null)
+                {
+                    // If no new shape was found and there was a previously selected shape, deselect it
+                    selectedShape.IsSelected = false;
+                    selectedShape = null;
+                }
+                Invalidate(); // Redraw to reflect selection changes
+            }
         }
 
-        private void OnMouseUpCreateShape(object sender, MouseEventArgs e)
+
+        private void OnMouseMoveCreateShape(object sender, MouseEventArgs e)
         {
-            // Factory method to create specific shape instance
-            Shape newShape = ShapeFactory.CreateShape(startPoint, e.Location);
-            shapes.Add(newShape);
-            this.Invalidate(); // Trigger redraw to show new shape
-            this.MouseUp -= OnMouseUpCreateShape; // Clean up event handlers
+            if (tempShape != null)
+            {
+                if (tempShape is Square || tempShape is Circle)
+                {
+                    ((dynamic)tempShape).UpdateEndPoint(e.Location);
+                }
+                // Other shapes logic...
+                this.Invalidate();
+            }
         }
 
-        private void HighlightSelectedShape()
+        private void OnMouseUpFinalizeShape(object sender, MouseEventArgs e)
         {
-            // Logic to visually highlight the selected shape
-            this.Invalidate();
+            if (tempShape != null)
+            {
+                shapes.Add(tempShape);
+                tempShape = null;
+                isCreateMode = false;
+                this.MouseMove -= OnMouseMoveCreateShape;
+                this.MouseUp -= OnMouseUpFinalizeShape;
+                this.Invalidate();
+            }
         }
-
-        private Point lastLocation;  // To store last location for movement
 
         private void StartMove()
         {
-            if (selectedShape == null) return;
-            MessageBox.Show("Drag to move the selected shape.");
-            this.MouseDown += BeginMove;
-            this.MouseMove += MoveShape;
-            this.MouseUp += EndMove;
-        }
-
-        private void BeginMove(object sender, MouseEventArgs e)
-        {
-            if (selectedShape != null && selectedShape.ContainsPoint(e.Location))
+            // If the selectedShape is already set, enable dragging immediately
+            if (selectedShape != null)
             {
-                lastLocation = e.Location;
+                // Subscribe to mouse events for dragging
+                this.MouseDown += OnMouseDownStartDrag;
+                this.MouseMove += OnMouseMoveDrag;
+                this.MouseUp += OnMouseUpEndDrag;
             }
         }
 
-        private void MoveShape(object sender, MouseEventArgs e)
+        private void OnMouseDownStartDrag(object sender, MouseEventArgs e)
         {
-            if (e.Button == MouseButtons.Left && selectedShape != null)
+            // If the mouse is down over the selected shape, begin drag
+            if (selectedShape.ContainsPoint(e.Location))
             {
-                var dx = e.X - lastLocation.X;
-                var dy = e.Y - lastLocation.Y;
+                // Capture the start point of the drag
+                lastMousePosition = e.Location;
+                isDragging = true;
+            }
+        }
+
+        private void OnMouseMoveDrag(object sender, MouseEventArgs e)
+        {
+            // If dragging, update the shape's position
+            if (isDragging && selectedShape != null)
+            {
+                int dx = e.X - lastMousePosition.X;
+                int dy = e.Y - lastMousePosition.Y;
+
+                // Move the shape
                 selectedShape.Move(dx, dy);
-                lastLocation = e.Location;
-                this.Invalidate(); // Refresh the form to update the position of the shape
+
+                // Update lastMousePosition
+                lastMousePosition = e.Location;
+
+                // Redraw the form
+                this.Invalidate();
             }
         }
 
-        private void EndMove(object sender, MouseEventArgs e)
+        private void OnMouseUpEndDrag(object sender, MouseEventArgs e)
         {
-            this.MouseMove -= MoveShape;
-            this.MouseUp -= EndMove;
-            this.MouseDown -= BeginMove;
+            // End dragging
+            isDragging = false;
+
+            // Unsubscribe from mouse events
+            this.MouseDown -= OnMouseDownStartDrag;
+            this.MouseMove -= OnMouseMoveDrag;
+            this.MouseUp -= OnMouseUpEndDrag;
         }
 
 
         private void StartRotate()
         {
-            // Implement rotation functionality here
+            // Rotation logic...
         }
 
-        private void DeleteShape(object sender, EventArgs e)
+        private void DeleteSelectedShape()
         {
             if (selectedShape != null)
             {
+                // Remove the selected shape from the list of shapes
                 shapes.Remove(selectedShape);
+                // Clear the selectedShape as it no longer exists
                 selectedShape = null;
-                this.Invalidate(); // Redraw to update the screen
+                // Force the form to redraw to reflect the removal of the shape
+                this.Invalidate();
+            }
+            else
+            {
+                // Optionally handle the case where no shape was selected but delete was attempted
+                MessageBox.Show("No shape selected to delete.", "Deletion Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
 
         protected override void OnPaint(PaintEventArgs e)
         {
@@ -149,7 +191,10 @@ namespace GrafPack
             {
                 shape.Draw(g);
             }
+            tempShape?.Draw(g); // Draw the temporary shape if it's not null
         }
+
+        // Other event handlers and methods...
     }
 
     public abstract class Shape
@@ -157,44 +202,103 @@ namespace GrafPack
         public abstract void Draw(Graphics g);
         public abstract bool ContainsPoint(Point p);
         public abstract void Move(int dx, int dy);
-
+        public abstract void UpdateEndPoint(Point newEndPoint);
+        public bool IsSelected { get; set; }
+        public Point StartPoint { get; protected set; }
+        public Point EndPoint { get; protected set; }
     }
 
+    public static class ShapeFactory
+    {
+        public static Shape CreateShape(Type shapeType, Point start)
+        {
+            if (shapeType == typeof(Square))
+            {
+                return new Square(start);
+            }
+            else if (shapeType == typeof(Circle))
+            {
+                return new Circle(start);
+            }
+            // Add logic for other shapes if necessary
+            throw new ArgumentException("Invalid shape type");
+        }
+    }
+
+    // Implementation for Square, Circle, and other shapes...
     public class Square : Shape
     {
-        private Point start, end;
-        public Square(Point start, Point end)
+        public Square(Point start) : base()
         {
-            this.start = start;
-            this.end = end;
-        }
-        public override void Move(int dx, int dy)
-        {
-            // Logic to move the square by dx and dy
-            start = new Point(start.X + dx, start.Y + dy);
-            end = new Point(end.X + dx, end.Y + dy);
+            this.StartPoint = start;
+            this.EndPoint = start; // Initially, the end point is the same as the start point.
         }
 
         public override void Draw(Graphics g)
         {
-            g.DrawRectangle(Pens.Black, start.X, start.Y, end.X - start.X, end.Y - start.Y);
+            using (Pen pen = IsSelected ? new Pen(Color.Red, 3) : new Pen(Color.Black))
+            {
+                // Calculate the size based on start and end points.
+                int size = Math.Max(Math.Abs(EndPoint.X - StartPoint.X), Math.Abs(EndPoint.Y - StartPoint.Y));
+                Rectangle rect = new Rectangle(StartPoint.X, StartPoint.Y, size, size);
+                g.DrawRectangle(pen, rect);
+            }
         }
 
         public override bool ContainsPoint(Point p)
         {
-            // Implement logic to determine if a point is inside the square
-            return (p.X >= start.X && p.X <= end.X && p.Y >= start.Y && p.Y <= end.Y);
+            int size = Math.Max(Math.Abs(EndPoint.X - StartPoint.X), Math.Abs(EndPoint.Y - StartPoint.Y));
+            return new Rectangle(StartPoint.X, StartPoint.Y, size, size).Contains(p);
         }
-    }
 
-    // Implement Triangle, Circle, etc.
-
-    public static class ShapeFactory
-    {
-        public static Shape CreateShape(Point start, Point end)
+        public override void Move(int dx, int dy)
         {
-            // Example of creating a Square; can be expanded for other shapes
-            return new Square(start, end);
+            StartPoint = new Point(StartPoint.X + dx, StartPoint.Y + dy);
+            EndPoint = new Point(EndPoint.X + dx, EndPoint.Y + dy);
+        }
+
+        public override void UpdateEndPoint(Point newEndPoint)
+        {
+            EndPoint = newEndPoint;
         }
     }
+
+    public class Circle : Shape
+    {
+        public Circle(Point center) : base()
+        {
+            this.StartPoint = center;
+            this.EndPoint = center; // Initially, the end point is the same as the center for the radius.
+        }
+
+        public override void Draw(Graphics g)
+        {
+            int radius = (int)Math.Sqrt(Math.Pow(EndPoint.X - StartPoint.X, 2) + Math.Pow(EndPoint.Y - StartPoint.Y, 2));
+            Point topLeft = new Point(StartPoint.X - radius, StartPoint.Y - radius);
+            Size size = new Size(radius * 2, radius * 2);
+            Rectangle rect = new Rectangle(topLeft, size);
+            using (Pen pen = IsSelected ? new Pen(Color.Red, 3) : new Pen(Color.Black))
+            {
+                g.DrawEllipse(pen, rect);
+            }
+        }
+
+        public override bool ContainsPoint(Point p)
+        {
+            int radius = (int)Math.Sqrt(Math.Pow(EndPoint.X - StartPoint.X, 2) + Math.Pow(EndPoint.Y - StartPoint.Y, 2));
+            return (Math.Pow(p.X - StartPoint.X, 2) + Math.Pow(p.Y - StartPoint.Y, 2)) <= (radius * radius);
+        }
+
+        public override void Move(int dx, int dy)
+        {
+            StartPoint = new Point(StartPoint.X + dx, StartPoint.Y + dy);
+            EndPoint = new Point(EndPoint.X + dx, EndPoint.Y + dy);
+        }
+
+        public override void UpdateEndPoint(Point newEndPoint)
+        {
+            EndPoint = newEndPoint;
+        }
+    }
+
 }
