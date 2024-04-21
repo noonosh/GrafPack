@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
+using static System.Windows.Forms.AxHost;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.ProgressBar;
 
 namespace GrafPack
 {
@@ -11,6 +13,7 @@ namespace GrafPack
         private Shape selectedShape;
         private Point lastMousePosition; // Store the last mouse position for dragging
         private bool isDragging;
+        private bool isRotating;
         private Shape tempShape; // Temporary shape for dynamic creation
         private MainMenu mainMenu;
         private bool isCreateMode = false;
@@ -78,6 +81,31 @@ namespace GrafPack
                         break;
                     }
                 }
+
+                // Check for a selected shape to either move or rotate
+                if (selectedShape != null && selectedShape.IsSelected)
+                {
+                    lastMousePosition = e.Location;
+
+                    // Determine if we are moving or rotating based on CTRL key
+                    if (Control.ModifierKeys == Keys.Control)
+                    {
+                        // Start rotating
+                        isRotating = true;
+                        this.MouseDown += OnMouseDownStartRotate;
+                        this.MouseMove += OnMouseMoveRotate;
+                        this.MouseUp += OnMouseUpEndRotate;
+                    }
+                    else
+                    {
+                        // Start moving
+                        isDragging = true;
+                        this.MouseDown += OnMouseDownStartDrag;
+                        this.MouseMove += OnMouseMoveDrag;
+                        this.MouseUp += OnMouseUpEndDrag;
+                    }
+                }
+
                 if (!shapeFound && selectedShape != null)
                 {
                     selectedShape.IsSelected = false;
@@ -171,7 +199,78 @@ namespace GrafPack
         private void StartRotate()
         {
             // Rotation logic...
+            if (selectedShape != null)
+            {
+                MessageBox.Show("Hold down CTRL and drag the mouse to rotate the selected shape.", "Rotate", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                // Subscribe to the mouse events for rotation.
+                this.MouseDown += OnMouseDownStartRotate;
+                this.MouseMove += OnMouseMoveRotate;
+                this.MouseUp += OnMouseUpEndRotate;
+            }
+            else
+            {
+                MessageBox.Show("No shape selected to rotate.", "Rotation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
+
+        private void OnMouseDownStartRotate(object sender, MouseEventArgs e)
+        {
+            // Check if the CTRL key is pressed and the mouse is down over the selected shape
+            if (Control.ModifierKeys == Keys.Control && selectedShape != null && selectedShape.ContainsPoint(e.Location))
+            {
+                lastMousePosition = e.Location;
+                isRotating = true; // Set the flag to true to indicate that rotation has started
+            }
+        }
+
+        private void OnMouseMoveRotate(object sender, MouseEventArgs e)
+        {
+            if (isRotating && selectedShape != null)
+            {
+                var angle = CalculateRotationAngle(lastMousePosition, e.Location, selectedShape.GetCenter());
+                selectedShape.Rotate(angle);
+                lastMousePosition = e.Location;
+                this.Invalidate(); // Ensure the form is redrawn to reflect the rotation
+            }
+        }
+
+        private void OnMouseUpEndRotate(object sender, MouseEventArgs e)
+        {
+            if (isRotating)
+            {
+                // Stop rotating
+                isRotating = false;
+                this.MouseDown -= OnMouseDownStartRotate;
+                this.MouseMove -= OnMouseMoveRotate;
+                this.MouseUp -= OnMouseUpEndRotate;
+                Invalidate();
+            }
+        }
+
+        private float CalculateRotationAngle(Point originalLocation, Point newLocation, Point center)
+        {
+            // Convert points to vectors relative to the center
+            PointF originalVector = new PointF(originalLocation.X - center.X, originalLocation.Y - center.Y);
+            PointF newVector = new PointF(newLocation.X - center.X, newLocation.Y - center.Y);
+
+            // Calculate the angle of each vector
+            float originalAngle = (float)Math.Atan2(originalVector.Y, originalVector.X);
+            float newAngle = (float)Math.Atan2(newVector.Y, newVector.X);
+
+            // Get the difference in angles
+            float angleDifference = newAngle - originalAngle;
+
+            // Convert the difference from radians to degrees
+            float angleDifferenceInDegrees = angleDifference * (180f / (float)Math.PI);
+
+            // Normalize the angle to be between 0 and 360
+            angleDifferenceInDegrees = (angleDifferenceInDegrees + 360) % 360;
+
+            return angleDifferenceInDegrees;
+        }
+
+
 
         private void DeleteSelectedShape()
         {
@@ -212,6 +311,8 @@ namespace GrafPack
         public abstract bool ContainsPoint(Point p);
         public abstract void Move(int dx, int dy);
         public abstract void UpdateEndPoint(Point newEndPoint);
+        public abstract void Rotate(float angle);
+        public abstract Point GetCenter();
         public bool IsSelected { get; set; }
         public Point StartPoint { get; protected set; }
         public Point EndPoint { get; protected set; }
@@ -237,10 +338,14 @@ namespace GrafPack
     // Implementation for Square, Circle, and other shapes...
     public class Square : Shape
     {
+        private PointF center;
+        private int size;
         public Square(Point start) : base()
         {
             this.StartPoint = start;
             this.EndPoint = start; // Initially, the end point is the same as the start point.
+            this.center = new PointF(start.X + size / 2f, start.Y + size / 2f);
+            this.size = size;
         }
 
         public override void Draw(Graphics g)
@@ -270,6 +375,55 @@ namespace GrafPack
         {
             EndPoint = newEndPoint;
         }
+
+        public override void Rotate(float angle)
+        {
+            // Convert degrees to radians
+            double radians = angle * Math.PI / 180.0;
+
+            // Calculate the new start and end points after rotation
+            float cosTheta = (float)Math.Cos(radians);
+            float sinTheta = (float)Math.Sin(radians);
+
+            float newStartX = (float)(center.X + ((StartPoint.X - center.X) * cosTheta - (StartPoint.Y - center.Y) * sinTheta));
+            float newStartY = (float)(center.Y + ((StartPoint.X - center.X) * sinTheta + (StartPoint.Y - center.Y) * cosTheta));
+            StartPoint = new Point((int)newStartX, (int)newStartY);
+
+            float newEndX = (float)(center.X + ((EndPoint.X - center.X) * cosTheta - (EndPoint.Y - center.Y) * sinTheta));
+            float newEndY = (float)(center.Y + ((EndPoint.X - center.X) * sinTheta + (EndPoint.Y - center.Y) * cosTheta));
+            EndPoint = new Point((int)newEndX, (int)newEndY);
+
+            // Recalculate the center point
+            center = new PointF((StartPoint.X + EndPoint.X) / 2f, (StartPoint.Y + EndPoint.Y) / 2f);
+        }
+
+
+        private PointF[] RotatePoints(float angle, PointF center, PointF[] points)
+        {
+            PointF[] rotatedPoints = new PointF[points.Length];
+            double radians = angle * Math.PI / 180.0;
+            double cosTheta = Math.Cos(radians);
+            double sinTheta = Math.Sin(radians);
+
+            for (int i = 0; i < points.Length; i++)
+            {
+                float x = points[i].X - center.X;
+                float y = points[i].Y - center.Y;
+
+                float newX = (float)(x * cosTheta - y * sinTheta) + center.X;
+                float newY = (float)(x * sinTheta + y * cosTheta) + center.Y;
+
+                rotatedPoints[i] = new PointF(newX, newY);
+            }
+
+            return rotatedPoints;
+        }
+        
+        public override Point GetCenter()
+        {
+            return Point.Round(center);
+        }
+
     }
 
     public class Circle : Shape
@@ -307,6 +461,17 @@ namespace GrafPack
         public override void UpdateEndPoint(Point newEndPoint)
         {
             EndPoint = newEndPoint;
+        }
+
+        public override Point GetCenter()
+        {
+            // Assuming StartPoint is the center for the circle
+            return StartPoint;
+        }
+
+        public override void Rotate(float angle)
+        {
+            throw new NotImplementedException();
         }
     }
 
