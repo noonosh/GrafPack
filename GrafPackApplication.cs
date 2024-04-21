@@ -15,7 +15,7 @@ namespace GrafPack
         private bool isDragging;
         private bool isRotating;
         private Shape tempShape; // Temporary shape for dynamic creation
-        private MainMenu mainMenu;
+        private MenuStrip menuStrip;
         private bool isCreateMode = false;
         private Type shapeToCreate;
         private Point startPoint;
@@ -33,29 +33,93 @@ namespace GrafPack
 
         private void SetupMainMenu()
         {
-            mainMenu = new MainMenu();
-            var createItem = new MenuItem("Create");
-            createItem.MenuItems.Add("Square", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Square); });
-            createItem.MenuItems.Add("Circle", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Circle); });
-            createItem.MenuItems.Add("Triangle", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Triangle); });
-            createItem.MenuItems.Add("Hexagon", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Hexagon); });
-            createItem.MenuItems.Add("Rectangle", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Rect); });
-            mainMenu.MenuItems.Add(createItem);
+            MenuStrip menuStrip = new MenuStrip();
 
-            mainMenu.MenuItems.Add("Select", (s, e) => isCreateMode = false);
-            mainMenu.MenuItems.Add("Move", (s, e) => StartMove());
+            //var createItem = new MenuItem("Create");
+            ToolStripMenuItem createItem = new ToolStripMenuItem("Create");
+            createItem.DropDownItems.Add("Square", null, (s, e) => { isCreateMode = true; shapeToCreate = typeof(Square); });
+            createItem.DropDownItems.Add("Circle", null, (s, e) => { isCreateMode = true; shapeToCreate = typeof(Circle); });
+            createItem.DropDownItems.Add("Triangle", null, (s, e) => { isCreateMode = true; shapeToCreate = typeof(Triangle); });
+            createItem.DropDownItems.Add("Hexagon", null, (s, e) => { isCreateMode = true; shapeToCreate = typeof(Hexagon); });
+            createItem.DropDownItems.Add("Rectangle", null, (s, e) => { isCreateMode = true; shapeToCreate = typeof(Rect); });
+            //mainMenu.MenuItems.Add(createItem);
+            menuStrip.Items.Add(createItem);
 
-            var rotateItem = new MenuItem("Rotate");
-            rotateItem.MenuItems.Add("45 Degrees", (s, e) => RotateSelectedShape(45));
-            rotateItem.MenuItems.Add("90 Degrees", (s, e) => RotateSelectedShape(90));
-            rotateItem.MenuItems.Add("135 Degrees", (s, e) => RotateSelectedShape(135));
-            mainMenu.MenuItems.Add(rotateItem);
+            //mainMenu.MenuItems.Add("Select", (s, e) => isCreateMode = false);
+            //mainMenu.MenuItems.Add("Move", (s, e) => StartMove());
 
-            MenuItem deleteItem = new MenuItem("Delete", (s, e) => DeleteSelectedShape());
-            mainMenu.MenuItems.Add(deleteItem);
-            mainMenu.MenuItems.Add("Exit", (s, e) => Close());
-            this.Menu = mainMenu;
+            menuStrip.Items.Add(new ToolStripMenuItem("Select", null, (s, e) => isCreateMode = false));
+            menuStrip.Items.Add(new ToolStripMenuItem("Move", null, (s, e) => StartMove()));
+
+            //var rotateItem = new MenuItem("Rotate");
+            ToolStripMenuItem rotateItem = new ToolStripMenuItem("Rotate");
+            rotateItem.DropDownItems.Add("45 Degrees", null, (s, e) => RotateSelectedShape(45));
+            rotateItem.DropDownItems.Add("90 Degrees", null, (s, e) => RotateSelectedShape(90));
+            rotateItem.DropDownItems.Add("135 Degrees", null, (s, e) => RotateSelectedShape(135));
+            //mainMenu.MenuItems.Add(rotateItem);
+            menuStrip.Items.Add(rotateItem);
+
+            ToolStripMenuItem deleteItem = new ToolStripMenuItem("Delete", null, (s, e) => DeleteSelectedShape());
+            menuStrip.Items.Add(deleteItem);
+            menuStrip.Items.Add("Exit", null, (s, e) => Close());
+
+            // Create the export item
+            ToolStripMenuItem exportItem = new ToolStripMenuItem("Export to JPEG", null, saveAsJPEGToolStripMenuItem_Click);
+            exportItem.Alignment = ToolStripItemAlignment.Right; // This makes it align to the right
+
+            // Add the export item
+            menuStrip.Items.Add(exportItem);
+
+            // Set the MenuStrip to the form
+            this.MainMenuStrip = menuStrip;
+            this.Controls.Add(menuStrip);
         }
+
+        private void ExportCanvasToImage(string filename)
+        {
+            // Create a bitmap with the size of the canvas you want to export
+            using (Bitmap bitmap = new Bitmap(this.ClientSize.Width, this.ClientSize.Height))
+            {
+                using (Graphics graphics = Graphics.FromImage(bitmap))
+                {
+                    // Set the graphics to have a white background or any other background color
+                    graphics.Clear(Color.White);
+
+                    // Redraw all shapes onto the graphics object of the bitmap
+                    foreach (var shape in shapes)
+                    {
+                        shape.Draw(graphics);
+                    }
+                }
+
+                // Save the bitmap to the specified file in JPEG format
+                bitmap.Save(filename, System.Drawing.Imaging.ImageFormat.Jpeg);
+            }
+        }
+
+        private void saveAsJPEGToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            using (SaveFileDialog saveFileDialog = new SaveFileDialog())
+            {
+                saveFileDialog.Filter = "JPEG Image|*.jpg";
+                saveFileDialog.Title = "Save as JPEG";
+
+                if (saveFileDialog.ShowDialog() == DialogResult.OK && saveFileDialog.FileName != "")
+                {
+                    try
+                    {
+                        ExportCanvasToImage(saveFileDialog.FileName);
+                        MessageBox.Show("Canvas exported successfully.", "Export", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Failed to export canvas. Error: {ex.Message}", "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+
+
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
