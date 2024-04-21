@@ -39,6 +39,7 @@ namespace GrafPack
             createItem.MenuItems.Add("Circle", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Circle); });
             createItem.MenuItems.Add("Triangle", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Triangle); });
             createItem.MenuItems.Add("Hexagon", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Hexagon); });
+            createItem.MenuItems.Add("Rectangle", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Rect); });
             mainMenu.MenuItems.Add(createItem);
 
             mainMenu.MenuItems.Add("Select", (s, e) => isCreateMode = false);
@@ -106,11 +107,7 @@ namespace GrafPack
         {
             if (tempShape != null)
             {
-                if (tempShape is Square || tempShape is Circle)
-                {
-                    ((dynamic)tempShape).UpdateEndPoint(e.Location);
-                }
-                // Other shapes logic...
+                ((dynamic)tempShape).UpdateEndPoint(e.Location);
                 this.Invalidate();
             }
         }
@@ -253,17 +250,19 @@ namespace GrafPack
             {
                 return new Circle(start);
             }
-            else if (shapeType == typeof(Triangle))
-            {
-                Point p1 = start;
-                Point p2 = new Point(start.X + 100, start.Y);
-                Point p3 = new Point(start.X + 50, start.Y - 86);
-                return new Triangle(p1, p2, p3);
-            }
             else if (shapeType == typeof(Hexagon))
             {
-                return new Hexagon(start, size); // Size here is the radius of the hexagon
+                return new Hexagon(start);
             }
+            else if (shapeType == typeof(Triangle))
+            {
+                return new Triangle(start);
+            }
+            else if (shapeType == typeof(Rect))
+            {
+                return new Rect(start); // Now only needs the start point
+            }
+
             throw new ArgumentException("Invalid shape type");
         }
 
@@ -390,78 +389,77 @@ namespace GrafPack
 
     public class Triangle : Shape
     {
-        private Point point1, point2, point3;
+        private Point[] vertices = new Point[3];
 
-        public Triangle(Point p1, Point p2, Point p3)
+        public Triangle(Point p1)
         {
-            point1 = p1;
-            point2 = p2;
-            point3 = p3;
-            this.StartPoint = p1;  // StartPoint can be any of the triangle's points
-            this.EndPoint = p3;    // EndPoint can be any of the triangle's points different from StartPoint
+            vertices[0] = p1; // Initial point
+                              // Initial values for other vertices, could be same as p1
+            vertices[1] = p1;
+            vertices[2] = p1;
         }
 
         public override void Draw(Graphics g)
         {
             using (Pen pen = IsSelected ? new Pen(Color.Red, 3) : new Pen(Color.Black))
             {
-                g.DrawLine(pen, point1, point2);
-                g.DrawLine(pen, point2, point3);
-                g.DrawLine(pen, point3, point1);
+                g.DrawPolygon(pen, vertices);
             }
         }
 
         public override bool ContainsPoint(Point p)
         {
-            // Using the ray-casting algorithm to determine if the point is inside the triangle
-            int[] x = { point1.X, point2.X, point3.X };
-            int[] y = { point1.Y, point2.Y, point3.Y };
-            int i, j = 2;
-            bool oddNodes = false;
-
-            for (i = 0; i < 3; i++)
+            // Helper method to calculate the area of a triangle given by 3 points
+            float Area(Point a, Point b, Point c)
             {
-                if ((y[i] < p.Y && y[j] >= p.Y || y[j] < p.Y && y[i] >= p.Y) &&
-                    (x[i] <= p.X || x[j] <= p.X))
-                {
-                    oddNodes ^= (x[i] + (p.Y - y[i]) / (y[j] - y[i]) * (x[j] - x[i]) < p.X);
-                }
-                j = i;
+                return Math.Abs(a.X * (b.Y - c.Y) + b.X * (c.Y - a.Y) + c.X * (a.Y - b.Y)) / 2.0f;
             }
 
-            return oddNodes;
+            // Calculate the area of the triangle formed by vertices point1, point2, and point3
+            float areaMain = Area(vertices[0], vertices[1], vertices[2]);
+            // Calculate the areas of the triangles formed with the point p
+            float area1 = Area(p, vertices[1], vertices[2]);
+            float area2 = Area(vertices[0], p, vertices[2]);
+            float area3 = Area(vertices[0], vertices[1], p);
+
+            // Check if the sum of area1, area2, and area3 is equal to areaMain
+            return Math.Abs(areaMain - (area1 + area2 + area3)) < 1e-5; // epsilon check for floating point comparison
         }
+
+
 
         public override void Move(int dx, int dy)
         {
-            point1.Offset(dx, dy);
-            point2.Offset(dx, dy);
-            point3.Offset(dx, dy);
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                vertices[i].Offset(dx, dy);
+            }
         }
 
         public override void UpdateEndPoint(Point newEndPoint)
         {
-            // This can be used to resize the triangle if necessary
-            EndPoint = newEndPoint;
+            // Calculate the new size of the triangle based on the new end point
+            // Let's say that newEndPoint will define the second point (opposite base) of the triangle
+            vertices[1] = new Point(vertices[0].X, newEndPoint.Y);
+            // For the third point, let's calculate it based on vector properties
+            Point midBase = new Point((vertices[0].X + vertices[1].X) / 2, (vertices[0].Y + vertices[1].Y) / 2);
+            vertices[2] = new Point(midBase.X + (midBase.Y - newEndPoint.Y), midBase.Y - (newEndPoint.X - midBase.X));
         }
 
         public override void Rotate(float angle)
         {
-            // Center of the triangle for rotation
             Point center = GetCenter();
-
-            // Convert degrees to radians
             double radians = angle * Math.PI / 180.0;
-            RotatePoint(ref point1, center, radians);
-            RotatePoint(ref point2, center, radians);
-            RotatePoint(ref point3, center, radians);
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                RotatePoint(ref vertices[i], center, radians);
+            }
         }
 
         public override Point GetCenter()
         {
-            // The centroid of the triangle
-            int centerX = (point1.X + point2.X + point3.X) / 3;
-            int centerY = (point1.Y + point2.Y + point3.Y) / 3;
+            int centerX = (vertices[0].X + vertices[1].X + vertices[2].X) / 3;
+            int centerY = (vertices[0].Y + vertices[1].Y + vertices[2].Y) / 3;
             return new Point(centerX, centerY);
         }
 
@@ -476,14 +474,18 @@ namespace GrafPack
 
     public class Hexagon : Shape
     {
+        private Point center;
+        private int radius;
         private Point[] vertices = new Point[6];
 
-        public Hexagon(Point center, int radius)
+        public Hexagon(Point center)
         {
-            CalculateVertices(center, radius);
+            this.center = center;
+            this.radius = 0; // Initial radius, to be updated
+            CalculateVertices();
         }
 
-        private void CalculateVertices(Point center, int radius)
+        private void CalculateVertices()
         {
             for (int i = 0; i < 6; i++)
             {
@@ -493,8 +495,6 @@ namespace GrafPack
                     center.Y + (int)(radius * Math.Sin(angle))
                 );
             }
-            StartPoint = vertices[0];
-            EndPoint = vertices[3]; // Points across the hexagon's diameter
         }
 
         public override void Draw(Graphics g)
@@ -528,7 +528,8 @@ namespace GrafPack
 
         public override void UpdateEndPoint(Point newEndPoint)
         {
-            // Could potentially re-calculate size based on new end point
+            radius = (int)Math.Sqrt(Math.Pow(newEndPoint.X - center.X, 2) + Math.Pow(newEndPoint.Y - center.Y, 2));
+            CalculateVertices();
         }
 
         public override void Rotate(float angle)
@@ -556,6 +557,65 @@ namespace GrafPack
             return new Point(sumX / vertices.Length, sumY / vertices.Length);
         }
     }
+
+
+    public class Rect : Shape
+    {
+        private Point topLeft;
+        private Point bottomRight;
+
+        public Rect(Point topLeft, Point bottomRight)
+        {
+            this.topLeft = topLeft;
+            this.bottomRight = bottomRight;
+            this.StartPoint = topLeft; // For simplicity, we can assume StartPoint is the top left corner
+            this.EndPoint = bottomRight; // Similarly, EndPoint can be the bottom right corner
+        }
+
+        public Rect(Point start) : base()
+        {
+            this.topLeft = start;
+            this.bottomRight = start; // Initially set to start, will change during drag
+        }
+
+        public override void Draw(Graphics g)
+        {
+            using (Pen pen = IsSelected ? new Pen(Color.Red, 3) : new Pen(Color.Black))
+            {
+                g.DrawRectangle(pen, new System.Drawing.Rectangle(topLeft.X, topLeft.Y, bottomRight.X - topLeft.X, bottomRight.Y - topLeft.Y));
+            }
+        }
+
+        public override bool ContainsPoint(Point p)
+        {
+            return p.X >= topLeft.X && p.X <= bottomRight.X && p.Y >= topLeft.Y && p.Y <= bottomRight.Y;
+        }
+
+        public override void Move(int dx, int dy)
+        {
+            topLeft.Offset(dx, dy);
+            bottomRight.Offset(dx, dy);
+        }
+
+        public override void UpdateEndPoint(Point newEndPoint)
+        {
+            this.bottomRight = newEndPoint; // Update bottomRight to the new end point during drag
+        }
+
+        public override void Rotate(float angle)
+        {
+            // Implement rotation logic if needed. For a rectangle, you may want to rotate around the center
+            // Or you can leave it unimplemented if rotation is not supported for rectangles
+        }
+
+        public override Point GetCenter()
+        {
+            int centerX = (topLeft.X + bottomRight.X) / 2;
+            int centerY = (topLeft.Y + bottomRight.Y) / 2;
+            return new Point(centerX, centerY);
+        }
+    }
+
 
 
 
