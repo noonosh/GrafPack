@@ -28,6 +28,7 @@ namespace GrafPack
             isDragging = false;
             lastMousePosition = new Point();
             this.WindowState = FormWindowState.Maximized;
+            this.Text = "GrafPack App";
         }
 
         private void SetupMainMenu()
@@ -36,6 +37,7 @@ namespace GrafPack
             var createItem = new MenuItem("Create");
             createItem.MenuItems.Add("Square", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Square); });
             createItem.MenuItems.Add("Circle", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Circle); });
+            createItem.MenuItems.Add("Triangle", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Triangle); });
             mainMenu.MenuItems.Add(createItem);
             mainMenu.MenuItems.Add("Select", (s, e) => isCreateMode = false);
             mainMenu.MenuItems.Add("Move", (s, e) => StartMove());
@@ -330,9 +332,17 @@ namespace GrafPack
             {
                 return new Circle(start);
             }
-            // Add logic for other shapes if necessary
+            else if (shapeType == typeof(Triangle))
+            {
+                // Assume default points for simplicity, adjust as needed
+                Point p1 = start;
+                Point p2 = new Point(start.X + 100, start.Y);
+                Point p3 = new Point(start.X + 50, start.Y - 86); // Height calculated for equilateral triangle
+                return new Triangle(p1, p2, p3);
+            }
             throw new ArgumentException("Invalid shape type");
         }
+
     }
 
     // Implementation for Square, Circle, and other shapes...
@@ -474,5 +484,92 @@ namespace GrafPack
             throw new NotImplementedException();
         }
     }
+
+    public class Triangle : Shape
+    {
+        private Point point1, point2, point3;
+
+        public Triangle(Point p1, Point p2, Point p3)
+        {
+            point1 = p1;
+            point2 = p2;
+            point3 = p3;
+            this.StartPoint = p1;  // StartPoint can be any of the triangle's points
+            this.EndPoint = p3;    // EndPoint can be any of the triangle's points different from StartPoint
+        }
+
+        public override void Draw(Graphics g)
+        {
+            using (Pen pen = IsSelected ? new Pen(Color.Red, 3) : new Pen(Color.Black))
+            {
+                g.DrawLine(pen, point1, point2);
+                g.DrawLine(pen, point2, point3);
+                g.DrawLine(pen, point3, point1);
+            }
+        }
+
+        public override bool ContainsPoint(Point p)
+        {
+            // Using the ray-casting algorithm to determine if the point is inside the triangle
+            int[] x = { point1.X, point2.X, point3.X };
+            int[] y = { point1.Y, point2.Y, point3.Y };
+            int i, j = 2;
+            bool oddNodes = false;
+
+            for (i = 0; i < 3; i++)
+            {
+                if ((y[i] < p.Y && y[j] >= p.Y || y[j] < p.Y && y[i] >= p.Y) &&
+                    (x[i] <= p.X || x[j] <= p.X))
+                {
+                    oddNodes ^= (x[i] + (p.Y - y[i]) / (y[j] - y[i]) * (x[j] - x[i]) < p.X);
+                }
+                j = i;
+            }
+
+            return oddNodes;
+        }
+
+        public override void Move(int dx, int dy)
+        {
+            point1.Offset(dx, dy);
+            point2.Offset(dx, dy);
+            point3.Offset(dx, dy);
+        }
+
+        public override void UpdateEndPoint(Point newEndPoint)
+        {
+            // This can be used to resize the triangle if necessary
+            EndPoint = newEndPoint;
+        }
+
+        public override void Rotate(float angle)
+        {
+            // Center of the triangle for rotation
+            Point center = GetCenter();
+
+            // Convert degrees to radians
+            double radians = angle * Math.PI / 180.0;
+            RotatePoint(ref point1, center, radians);
+            RotatePoint(ref point2, center, radians);
+            RotatePoint(ref point3, center, radians);
+        }
+
+        public override Point GetCenter()
+        {
+            // The centroid of the triangle
+            int centerX = (point1.X + point2.X + point3.X) / 3;
+            int centerY = (point1.Y + point2.Y + point3.Y) / 3;
+            return new Point(centerX, centerY);
+        }
+
+        private void RotatePoint(ref Point point, Point center, double radians)
+        {
+            int x = point.X - center.X;
+            int y = point.Y - center.Y;
+            point.X = center.X + (int)(x * Math.Cos(radians) - y * Math.Sin(radians));
+            point.Y = center.Y + (int)(x * Math.Sin(radians) + y * Math.Cos(radians));
+        }
+    }
+
 
 }
