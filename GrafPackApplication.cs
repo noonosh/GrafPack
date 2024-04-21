@@ -48,7 +48,7 @@ namespace GrafPack
             //mainMenu.MenuItems.Add("Select", (s, e) => isCreateMode = false);
             //mainMenu.MenuItems.Add("Move", (s, e) => StartMove());
 
-            menuStrip.Items.Add(new ToolStripMenuItem("Select", null, (s, e) => isCreateMode = false));
+            menuStrip.Items.Add(new ToolStripMenuItem("Select", null, (s, e) => StartSelect()));
             menuStrip.Items.Add(new ToolStripMenuItem("Move", null, (s, e) => StartMove()));
 
             //var rotateItem = new MenuItem("Rotate");
@@ -240,6 +240,11 @@ namespace GrafPack
 
         /////////////////////////////////////////////////////////////////////
 
+        private void StartSelect()
+        {
+            MessageBox.Show("Select the shape to perform actions", "Shape selection", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            isCreateMode = false;
+        }
 
 
         private void RotateSelectedShape(float degrees)
@@ -679,8 +684,5 @@ namespace GrafPack
             return new Point(centerX, centerY);
         }
     }
-
-
-
 
 }
