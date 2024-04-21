@@ -38,13 +38,21 @@ namespace GrafPack
             createItem.MenuItems.Add("Square", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Square); });
             createItem.MenuItems.Add("Circle", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Circle); });
             createItem.MenuItems.Add("Triangle", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Triangle); });
+            createItem.MenuItems.Add("Hexagon", (s, e) => { isCreateMode = true; shapeToCreate = typeof(Hexagon); });
             mainMenu.MenuItems.Add(createItem);
+
             mainMenu.MenuItems.Add("Select", (s, e) => isCreateMode = false);
             mainMenu.MenuItems.Add("Move", (s, e) => StartMove());
-            mainMenu.MenuItems.Add("Rotate", (s, e) => StartRotate());
+
+            var rotateItem = new MenuItem("Rotate");
+            rotateItem.MenuItems.Add("45 Degrees", (s, e) => RotateSelectedShape(45));
+            rotateItem.MenuItems.Add("90 Degrees", (s, e) => RotateSelectedShape(90));
+            rotateItem.MenuItems.Add("135 Degrees", (s, e) => RotateSelectedShape(135));
+            mainMenu.MenuItems.Add(rotateItem);
+
             MenuItem deleteItem = new MenuItem("Delete", (s, e) => DeleteSelectedShape());
-            mainMenu.MenuItems.Add("Exit", (s, e) => Close());
             mainMenu.MenuItems.Add(deleteItem);
+            mainMenu.MenuItems.Add("Exit", (s, e) => Close());
             this.Menu = mainMenu;
         }
 
@@ -84,30 +92,6 @@ namespace GrafPack
                     }
                 }
 
-                // Check for a selected shape to either move or rotate
-                if (selectedShape != null && selectedShape.IsSelected)
-                {
-                    lastMousePosition = e.Location;
-
-                    // Determine if we are moving or rotating based on CTRL key
-                    if (Control.ModifierKeys == Keys.Control)
-                    {
-                        // Start rotating
-                        isRotating = true;
-                        this.MouseDown += OnMouseDownStartRotate;
-                        this.MouseMove += OnMouseMoveRotate;
-                        this.MouseUp += OnMouseUpEndRotate;
-                    }
-                    else
-                    {
-                        // Start moving
-                        isDragging = true;
-                        this.MouseDown += OnMouseDownStartDrag;
-                        this.MouseMove += OnMouseMoveDrag;
-                        this.MouseUp += OnMouseUpEndDrag;
-                    }
-                }
-
                 if (!shapeFound && selectedShape != null)
                 {
                     selectedShape.IsSelected = false;
@@ -116,7 +100,6 @@ namespace GrafPack
                 Invalidate();
             }
         }
-
 
 
         private void OnMouseMoveCreateShape(object sender, MouseEventArgs e)
@@ -198,80 +181,18 @@ namespace GrafPack
 
 
 
-        private void StartRotate()
+        private void RotateSelectedShape(float degrees)
         {
-            // Rotation logic...
             if (selectedShape != null)
             {
-                MessageBox.Show("Hold down CTRL and drag the mouse to rotate the selected shape.", "Rotate", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                // Subscribe to the mouse events for rotation.
-                this.MouseDown += OnMouseDownStartRotate;
-                this.MouseMove += OnMouseMoveRotate;
-                this.MouseUp += OnMouseUpEndRotate;
+                selectedShape.Rotate(degrees);
+                this.Invalidate(); // Redraw the form to update the display
             }
             else
             {
                 MessageBox.Show("No shape selected to rotate.", "Rotation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
-
-        private void OnMouseDownStartRotate(object sender, MouseEventArgs e)
-        {
-            // Check if the CTRL key is pressed and the mouse is down over the selected shape
-            if (Control.ModifierKeys == Keys.Control && selectedShape != null && selectedShape.ContainsPoint(e.Location))
-            {
-                lastMousePosition = e.Location;
-                isRotating = true; // Set the flag to true to indicate that rotation has started
-            }
-        }
-
-        private void OnMouseMoveRotate(object sender, MouseEventArgs e)
-        {
-            if (isRotating && selectedShape != null)
-            {
-                var angle = CalculateRotationAngle(lastMousePosition, e.Location, selectedShape.GetCenter());
-                selectedShape.Rotate(angle);
-                lastMousePosition = e.Location;
-                this.Invalidate(); // Ensure the form is redrawn to reflect the rotation
-            }
-        }
-
-        private void OnMouseUpEndRotate(object sender, MouseEventArgs e)
-        {
-            if (isRotating)
-            {
-                // Stop rotating
-                isRotating = false;
-                this.MouseDown -= OnMouseDownStartRotate;
-                this.MouseMove -= OnMouseMoveRotate;
-                this.MouseUp -= OnMouseUpEndRotate;
-                Invalidate();
-            }
-        }
-
-        private float CalculateRotationAngle(Point originalLocation, Point newLocation, Point center)
-        {
-            // Convert points to vectors relative to the center
-            PointF originalVector = new PointF(originalLocation.X - center.X, originalLocation.Y - center.Y);
-            PointF newVector = new PointF(newLocation.X - center.X, newLocation.Y - center.Y);
-
-            // Calculate the angle of each vector
-            float originalAngle = (float)Math.Atan2(originalVector.Y, originalVector.X);
-            float newAngle = (float)Math.Atan2(newVector.Y, newVector.X);
-
-            // Get the difference in angles
-            float angleDifference = newAngle - originalAngle;
-
-            // Convert the difference from radians to degrees
-            float angleDifferenceInDegrees = angleDifference * (180f / (float)Math.PI);
-
-            // Normalize the angle to be between 0 and 360
-            angleDifferenceInDegrees = (angleDifferenceInDegrees + 360) % 360;
-
-            return angleDifferenceInDegrees;
-        }
-
 
 
         private void DeleteSelectedShape()
@@ -322,7 +243,7 @@ namespace GrafPack
 
     public static class ShapeFactory
     {
-        public static Shape CreateShape(Type shapeType, Point start)
+        public static Shape CreateShape(Type shapeType, Point start, int size = 200) // Default size parameter
         {
             if (shapeType == typeof(Square))
             {
@@ -334,14 +255,18 @@ namespace GrafPack
             }
             else if (shapeType == typeof(Triangle))
             {
-                // Assume default points for simplicity, adjust as needed
                 Point p1 = start;
                 Point p2 = new Point(start.X + 100, start.Y);
-                Point p3 = new Point(start.X + 50, start.Y - 86); // Height calculated for equilateral triangle
+                Point p3 = new Point(start.X + 50, start.Y - 86);
                 return new Triangle(p1, p2, p3);
+            }
+            else if (shapeType == typeof(Hexagon))
+            {
+                return new Hexagon(start, size); // Size here is the radius of the hexagon
             }
             throw new ArgumentException("Invalid shape type");
         }
+
 
     }
 
@@ -407,28 +332,6 @@ namespace GrafPack
             center = new PointF((StartPoint.X + EndPoint.X) / 2f, (StartPoint.Y + EndPoint.Y) / 2f);
         }
 
-
-        private PointF[] RotatePoints(float angle, PointF center, PointF[] points)
-        {
-            PointF[] rotatedPoints = new PointF[points.Length];
-            double radians = angle * Math.PI / 180.0;
-            double cosTheta = Math.Cos(radians);
-            double sinTheta = Math.Sin(radians);
-
-            for (int i = 0; i < points.Length; i++)
-            {
-                float x = points[i].X - center.X;
-                float y = points[i].Y - center.Y;
-
-                float newX = (float)(x * cosTheta - y * sinTheta) + center.X;
-                float newY = (float)(x * sinTheta + y * cosTheta) + center.Y;
-
-                rotatedPoints[i] = new PointF(newX, newY);
-            }
-
-            return rotatedPoints;
-        }
-        
         public override Point GetCenter()
         {
             return Point.Round(center);
@@ -570,6 +473,90 @@ namespace GrafPack
             point.Y = center.Y + (int)(x * Math.Sin(radians) + y * Math.Cos(radians));
         }
     }
+
+    public class Hexagon : Shape
+    {
+        private Point[] vertices = new Point[6];
+
+        public Hexagon(Point center, int radius)
+        {
+            CalculateVertices(center, radius);
+        }
+
+        private void CalculateVertices(Point center, int radius)
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                double angle = Math.PI / 3 * i;
+                vertices[i] = new Point(
+                    center.X + (int)(radius * Math.Cos(angle)),
+                    center.Y + (int)(radius * Math.Sin(angle))
+                );
+            }
+            StartPoint = vertices[0];
+            EndPoint = vertices[3]; // Points across the hexagon's diameter
+        }
+
+        public override void Draw(Graphics g)
+        {
+            using (Pen pen = IsSelected ? new Pen(Color.Red, 3) : new Pen(Color.Black))
+            {
+                g.DrawPolygon(pen, vertices);
+            }
+        }
+
+        public override bool ContainsPoint(Point p)
+        {
+            int crossingNumber = 0;
+            for (int i = 0, j = vertices.Length - 1; i < vertices.Length; j = i++)
+            {
+                if (((vertices[i].Y > p.Y) != (vertices[j].Y > p.Y)) &&
+                    (p.X < (vertices[j].X - vertices[i].X) * (p.Y - vertices[i].Y) / (vertices[j].Y - vertices[i].Y) + vertices[i].X))
+                    crossingNumber++;
+            }
+            return (crossingNumber % 2 == 1);
+        }
+
+        public override void Move(int dx, int dy)
+        {
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                vertices[i].X += dx;
+                vertices[i].Y += dy;
+            }
+        }
+
+        public override void UpdateEndPoint(Point newEndPoint)
+        {
+            // Could potentially re-calculate size based on new end point
+        }
+
+        public override void Rotate(float angle)
+        {
+            Point center = GetCenter();
+            double radians = angle * Math.PI / 180.0;
+
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                int x = vertices[i].X - center.X;
+                int y = vertices[i].Y - center.Y;
+                vertices[i].X = center.X + (int)(x * Math.Cos(radians) - y * Math.Sin(radians));
+                vertices[i].Y = center.Y + (int)(x * Math.Sin(radians) + y * Math.Cos(radians));
+            }
+        }
+
+        public override Point GetCenter()
+        {
+            int sumX = 0, sumY = 0;
+            foreach (Point vertex in vertices)
+            {
+                sumX += vertex.X;
+                sumY += vertex.Y;
+            }
+            return new Point(sumX / vertices.Length, sumY / vertices.Length);
+        }
+    }
+
 
 
 }
