@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
-using static System.Windows.Forms.AxHost;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.ProgressBar;
 
 namespace GrafPack
 {
@@ -11,10 +9,10 @@ namespace GrafPack
     {
         private List<Shape> shapes = new List<Shape>();
         private Shape selectedShape;
-        private Point lastMousePosition; // Store the last mouse position for dragging
+        private Point lastMousePosition;
         private bool isDragging;
         private bool isRotating;
-        private Shape tempShape; // Temporary shape for dynamic creation
+        private Shape tempShape;
         private MenuStrip menuStrip;
         private bool isCreateMode = false;
         private bool isTextAnnotationMode = false;
@@ -36,28 +34,22 @@ namespace GrafPack
         {
             MenuStrip menuStrip = new MenuStrip();
 
-            //var createItem = new MenuItem("Create");
             ToolStripMenuItem createItem = new ToolStripMenuItem("Create");
             createItem.DropDownItems.Add("Square", null, (s, e) => { isCreateMode = true; shapeToCreate = typeof(Square); });
             createItem.DropDownItems.Add("Circle", null, (s, e) => { isCreateMode = true; shapeToCreate = typeof(Circle); });
             createItem.DropDownItems.Add("Triangle", null, (s, e) => { isCreateMode = true; shapeToCreate = typeof(Triangle); });
             createItem.DropDownItems.Add("Hexagon", null, (s, e) => { isCreateMode = true; shapeToCreate = typeof(Hexagon); });
             createItem.DropDownItems.Add("Rectangle", null, (s, e) => { isCreateMode = true; shapeToCreate = typeof(Rect); });
-            //mainMenu.MenuItems.Add(createItem);
             menuStrip.Items.Add(createItem);
 
-            //mainMenu.MenuItems.Add("Select", (s, e) => isCreateMode = false);
-            //mainMenu.MenuItems.Add("Move", (s, e) => StartMove());
 
             menuStrip.Items.Add(new ToolStripMenuItem("Select", null, (s, e) => StartSelect()));
             menuStrip.Items.Add(new ToolStripMenuItem("Move", null, (s, e) => StartMove()));
 
-            //var rotateItem = new MenuItem("Rotate");
             ToolStripMenuItem rotateItem = new ToolStripMenuItem("Rotate");
             rotateItem.DropDownItems.Add("45 Degrees", null, (s, e) => RotateSelectedShape(45));
             rotateItem.DropDownItems.Add("90 Degrees", null, (s, e) => RotateSelectedShape(90));
             rotateItem.DropDownItems.Add("135 Degrees", null, (s, e) => RotateSelectedShape(135));
-            //mainMenu.MenuItems.Add(rotateItem);
             menuStrip.Items.Add(rotateItem);
 
             ToolStripMenuItem textAnnotationItem = new ToolStripMenuItem("Text Annotation");
@@ -68,36 +60,28 @@ namespace GrafPack
             menuStrip.Items.Add(deleteItem);
             menuStrip.Items.Add("Exit", null, (s, e) => Close());
 
-            // Create the export item
             ToolStripMenuItem exportItem = new ToolStripMenuItem("Export to JPEG", null, saveAsJPEGToolStripMenuItem_Click);
-            exportItem.Alignment = ToolStripItemAlignment.Right; // This makes it align to the right
-
-            // Add the export item
+            exportItem.Alignment = ToolStripItemAlignment.Right;
             menuStrip.Items.Add(exportItem);
 
-            // Set the MenuStrip to the form
             this.MainMenuStrip = menuStrip;
             this.Controls.Add(menuStrip);
         }
 
         private void ExportCanvasToImage(string filename)
         {
-            // Create a bitmap with the size of the canvas you want to export
             using (Bitmap bitmap = new Bitmap(this.ClientSize.Width, this.ClientSize.Height))
             {
                 using (Graphics graphics = Graphics.FromImage(bitmap))
                 {
-                    // Set the graphics to have a white background or any other background color
                     graphics.Clear(Color.White);
 
-                    // Redraw all shapes onto the graphics object of the bitmap
                     foreach (var shape in shapes)
                     {
                         shape.Draw(graphics);
                     }
                 }
 
-                // Save the bitmap to the specified file in JPEG format
                 bitmap.Save(filename, System.Drawing.Imaging.ImageFormat.Jpeg);
             }
         }
@@ -126,7 +110,6 @@ namespace GrafPack
 
         private void TextAnnotation_Click(object sender, EventArgs e)
         {
-            // Set a mode that enables text annotation
             isTextAnnotationMode = true;
         }
 
@@ -134,13 +117,10 @@ namespace GrafPack
         {
             TextBox txtBox = new TextBox();
             txtBox.Location = location;
-            txtBox.Width = 100; // Set the initial width of the text box
-            txtBox.Font = new Font("Helvetica", 16);
-            txtBox.Leave += TxtBox_Leave; // Handle focus loss
-            txtBox.KeyDown += TxtBox_KeyDown; // Handle Enter key
-
+            txtBox.Width = 100; txtBox.Font = new Font("Helvetica", 16);
+            txtBox.Leave += TxtBox_Leave; txtBox.KeyDown += TxtBox_KeyDown;
             this.Controls.Add(txtBox);
-            txtBox.Focus(); // Focus the text box to start typing immediately
+            txtBox.Focus();
         }
 
         private void TxtBox_KeyDown(object sender, KeyEventArgs e)
@@ -150,7 +130,6 @@ namespace GrafPack
                 TextBox txtBox = sender as TextBox;
                 if (txtBox != null)
                 {
-                    // Optionally convert this TextBox into a static text (Label) if needed
                     Label label = new Label();
                     label.Text = txtBox.Text;
                     label.Location = txtBox.Location;
@@ -160,7 +139,7 @@ namespace GrafPack
                     this.Controls.Add(label);
                     txtBox.Dispose();
 
-                    e.SuppressKeyPress = true;  // Prevent ding sound
+                    e.SuppressKeyPress = true;
                 }
             }
         }
@@ -170,7 +149,6 @@ namespace GrafPack
             TextBox txtBox = sender as TextBox;
             if (txtBox != null)
             {
-                // Convert the TextBox into a static text (Label) if needed
                 Label label = new Label();
                 label.Text = txtBox.Text;
                 label.Location = txtBox.Location;
@@ -190,7 +168,7 @@ namespace GrafPack
             if (isTextAnnotationMode)
             {
                 CreateTextBoxAtLocation(e.Location);
-                isTextAnnotationMode = false; // Reset or keep it true if you want to add multiple annotations
+                isTextAnnotationMode = false;
             }
 
             if (isCreateMode)
@@ -209,13 +187,11 @@ namespace GrafPack
                     {
                         if (selectedShape != null)
                         {
-                            selectedShape.IsSelected = false; // Deselect the previously selected shape
+                            selectedShape.IsSelected = false;
                         }
                         selectedShape = shape;
-                        selectedShape.IsSelected = true; // Highlight the newly selected shape
-                        shapeFound = true;
+                        selectedShape.IsSelected = true; shapeFound = true;
 
-                        // Prepare to move immediately without needing to select "Move" from the menu
                         lastMousePosition = e.Location;
                         isDragging = true;
                         this.MouseDown += OnMouseDownStartDrag;
@@ -257,7 +233,6 @@ namespace GrafPack
             }
         }
 
-        /////////////////////////////////////////////////////////////////////
 
         private void StartMove()
         {
@@ -273,7 +248,6 @@ namespace GrafPack
 
         private void OnMouseDownStartDrag(object sender, MouseEventArgs e)
         {
-            // Already set up in the OnMouseDown, ensure we're over the selected shape
             if (selectedShape != null && selectedShape.ContainsPoint(e.Location) && !isDragging)
             {
                 lastMousePosition = e.Location;
@@ -306,7 +280,6 @@ namespace GrafPack
         }
 
 
-        /////////////////////////////////////////////////////////////////////
 
         private void StartSelect()
         {
@@ -320,7 +293,7 @@ namespace GrafPack
             if (selectedShape != null)
             {
                 selectedShape.Rotate(degrees);
-                this.Invalidate(); // Redraw the form to update the display
+                this.Invalidate();
             }
             else
             {
@@ -333,16 +306,12 @@ namespace GrafPack
         {
             if (selectedShape != null)
             {
-                // Remove the selected shape from the list of shapes
                 shapes.Remove(selectedShape);
-                // Clear the selectedShape as it no longer exists
                 selectedShape = null;
-                // Force the form to redraw to reflect the removal of the shape
                 this.Invalidate();
             }
             else
             {
-                // Optionally handle the case where no shape was selected but delete was attempted
                 MessageBox.Show("No shape selected to delete.", "Deletion Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -356,10 +325,9 @@ namespace GrafPack
             {
                 shape.Draw(g);
             }
-            tempShape?.Draw(g); // Draw the temporary shape if it's not null
+            tempShape?.Draw(g);
         }
 
-        // Other event handlers and methods...
     }
 
     public abstract class Shape
@@ -377,7 +345,7 @@ namespace GrafPack
 
     public static class ShapeFactory
     {
-        public static Shape CreateShape(Type shapeType, Point start, int size = 200) // Default size parameter
+        public static Shape CreateShape(Type shapeType, Point start, int size = 200)
         {
             if (shapeType == typeof(Square))
             {
@@ -397,7 +365,7 @@ namespace GrafPack
             }
             else if (shapeType == typeof(Rect))
             {
-                return new Rect(start); // Now only needs the start point
+                return new Rect(start);
             }
 
             throw new ArgumentException("Invalid shape type");
@@ -406,7 +374,6 @@ namespace GrafPack
 
     }
 
-    // Implementation for Square, Circle, and other shapes...
     public class Square : Shape
     {
         private PointF center;
@@ -414,8 +381,7 @@ namespace GrafPack
         public Square(Point start) : base()
         {
             this.StartPoint = start;
-            this.EndPoint = start; // Initially, the end point is the same as the start point.
-            this.center = new PointF(start.X + size / 2f, start.Y + size / 2f);
+            this.EndPoint = start; this.center = new PointF(start.X + size / 2f, start.Y + size / 2f);
             this.size = size;
         }
 
@@ -423,7 +389,6 @@ namespace GrafPack
         {
             using (Pen pen = IsSelected ? new Pen(Color.Red, 3) : new Pen(Color.Black))
             {
-                // Calculate the size based on start and end points.
                 int size = Math.Max(Math.Abs(EndPoint.X - StartPoint.X), Math.Abs(EndPoint.Y - StartPoint.Y));
                 Rectangle rect = new Rectangle(StartPoint.X, StartPoint.Y, size, size);
                 g.DrawRectangle(pen, rect);
@@ -449,10 +414,8 @@ namespace GrafPack
 
         public override void Rotate(float angle)
         {
-            // Convert degrees to radians
             double radians = angle * Math.PI / 180.0;
 
-            // Calculate the new start and end points after rotation
             float cosTheta = (float)Math.Cos(radians);
             float sinTheta = (float)Math.Sin(radians);
 
@@ -464,7 +427,6 @@ namespace GrafPack
             float newEndY = (float)(center.Y + ((EndPoint.X - center.X) * sinTheta + (EndPoint.Y - center.Y) * cosTheta));
             EndPoint = new Point((int)newEndX, (int)newEndY);
 
-            // Recalculate the center point
             center = new PointF((StartPoint.X + EndPoint.X) / 2f, (StartPoint.Y + EndPoint.Y) / 2f);
         }
 
@@ -480,7 +442,7 @@ namespace GrafPack
         public Circle(Point center) : base()
         {
             this.StartPoint = center;
-            this.EndPoint = center; // Initially, the end point is the same as the center for the radius.
+            this.EndPoint = center;
         }
 
         public override void Draw(Graphics g)
@@ -514,7 +476,6 @@ namespace GrafPack
 
         public override Point GetCenter()
         {
-            // Assuming StartPoint is the center for the circle
             return StartPoint;
         }
 
@@ -530,9 +491,7 @@ namespace GrafPack
 
         public Triangle(Point p1)
         {
-            vertices[0] = p1; // Initial point
-                              // Initial values for other vertices, could be same as p1
-            vertices[1] = p1;
+            vertices[0] = p1; vertices[1] = p1;
             vertices[2] = p1;
         }
 
@@ -546,21 +505,17 @@ namespace GrafPack
 
         public override bool ContainsPoint(Point p)
         {
-            // Helper method to calculate the area of a triangle given by 3 points
             float Area(Point a, Point b, Point c)
             {
                 return Math.Abs(a.X * (b.Y - c.Y) + b.X * (c.Y - a.Y) + c.X * (a.Y - b.Y)) / 2.0f;
             }
 
-            // Calculate the area of the triangle formed by vertices point1, point2, and point3
             float areaMain = Area(vertices[0], vertices[1], vertices[2]);
-            // Calculate the areas of the triangles formed with the point p
             float area1 = Area(p, vertices[1], vertices[2]);
             float area2 = Area(vertices[0], p, vertices[2]);
             float area3 = Area(vertices[0], vertices[1], p);
 
-            // Check if the sum of area1, area2, and area3 is equal to areaMain
-            return Math.Abs(areaMain - (area1 + area2 + area3)) < 1e-5; // epsilon check for floating point comparison
+            return Math.Abs(areaMain - (area1 + area2 + area3)) < 1e-5;
         }
 
 
@@ -575,10 +530,7 @@ namespace GrafPack
 
         public override void UpdateEndPoint(Point newEndPoint)
         {
-            // Calculate the new size of the triangle based on the new end point
-            // Let's say that newEndPoint will define the second point (opposite base) of the triangle
             vertices[1] = new Point(vertices[0].X, newEndPoint.Y);
-            // For the third point, let's calculate it based on vector properties
             Point midBase = new Point((vertices[0].X + vertices[1].X) / 2, (vertices[0].Y + vertices[1].Y) / 2);
             vertices[2] = new Point(midBase.X + (midBase.Y - newEndPoint.Y), midBase.Y - (newEndPoint.X - midBase.X));
         }
@@ -618,8 +570,7 @@ namespace GrafPack
         public Hexagon(Point center)
         {
             this.center = center;
-            this.radius = 0; // Initial radius, to be updated
-            CalculateVertices();
+            this.radius = 0; CalculateVertices();
         }
 
         private void CalculateVertices()
@@ -705,14 +656,13 @@ namespace GrafPack
         {
             this.topLeft = topLeft;
             this.bottomRight = bottomRight;
-            this.StartPoint = topLeft; // For simplicity, we can assume StartPoint is the top left corner
-            this.EndPoint = bottomRight; // Similarly, EndPoint can be the bottom right corner
+            this.StartPoint = topLeft; this.EndPoint = bottomRight;
         }
 
         public Rect(Point start) : base()
         {
             this.topLeft = start;
-            this.bottomRight = start; // Initially set to start, will change during drag
+            this.bottomRight = start;
         }
 
         public override void Draw(Graphics g)
@@ -736,13 +686,11 @@ namespace GrafPack
 
         public override void UpdateEndPoint(Point newEndPoint)
         {
-            this.bottomRight = newEndPoint; // Update bottomRight to the new end point during drag
+            this.bottomRight = newEndPoint;
         }
 
         public override void Rotate(float angle)
         {
-            // Implement rotation logic if needed. For a rectangle, you may want to rotate around the center
-            // Or you can leave it unimplemented if rotation is not supported for rectangles
         }
 
         public override Point GetCenter()
