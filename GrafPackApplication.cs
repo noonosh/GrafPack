@@ -58,7 +58,11 @@ namespace GrafPack
 
             ToolStripMenuItem deleteItem = new ToolStripMenuItem("Delete", null, (s, e) => DeleteSelectedShape());
             menuStrip.Items.Add(deleteItem);
-            menuStrip.Items.Add("Exit", null, (s, e) => Close());
+
+
+            ToolStripMenuItem exitItem = new ToolStripMenuItem("Exit");
+            exitItem.Click += ExitItem_Click;
+            menuStrip.Items.Add(exitItem);
 
             ToolStripMenuItem exportItem = new ToolStripMenuItem("Export to JPEG", null, saveAsJPEGToolStripMenuItem_Click);
             exportItem.Alignment = ToolStripItemAlignment.Right;
@@ -66,6 +70,20 @@ namespace GrafPack
 
             this.MainMenuStrip = menuStrip;
             this.Controls.Add(menuStrip);
+        }
+
+        private void ExitItem_Click(object sender, EventArgs e)
+        {
+            ShowExitConfirmation();
+        }
+
+        private void ShowExitConfirmation()
+        {
+            DialogResult dialogResult = MessageBox.Show("All unsaved work will be lost. Are you sure you want to exit?", "Exit Confirmation", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning);
+            if (dialogResult == DialogResult.OK)
+            {
+                Application.Exit();
+            }
         }
 
         private void ExportCanvasToImage(string filename)
