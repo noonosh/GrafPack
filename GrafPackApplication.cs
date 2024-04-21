@@ -17,6 +17,7 @@ namespace GrafPack
         private Shape tempShape; // Temporary shape for dynamic creation
         private MenuStrip menuStrip;
         private bool isCreateMode = false;
+        private bool isTextAnnotationMode = false;
         private Type shapeToCreate;
         private Point startPoint;
 
@@ -58,6 +59,10 @@ namespace GrafPack
             rotateItem.DropDownItems.Add("135 Degrees", null, (s, e) => RotateSelectedShape(135));
             //mainMenu.MenuItems.Add(rotateItem);
             menuStrip.Items.Add(rotateItem);
+
+            ToolStripMenuItem textAnnotationItem = new ToolStripMenuItem("Text Annotation");
+            textAnnotationItem.Click += TextAnnotation_Click;
+            menuStrip.Items.Add(textAnnotationItem);
 
             ToolStripMenuItem deleteItem = new ToolStripMenuItem("Delete", null, (s, e) => DeleteSelectedShape());
             menuStrip.Items.Add(deleteItem);
@@ -119,11 +124,74 @@ namespace GrafPack
             }
         }
 
+        private void TextAnnotation_Click(object sender, EventArgs e)
+        {
+            // Set a mode that enables text annotation
+            isTextAnnotationMode = true;
+        }
+
+        private void CreateTextBoxAtLocation(Point location)
+        {
+            TextBox txtBox = new TextBox();
+            txtBox.Location = location;
+            txtBox.Width = 100; // Set the initial width of the text box
+            txtBox.Font = new Font("Helvetica", 16);
+            txtBox.Leave += TxtBox_Leave; // Handle focus loss
+            txtBox.KeyDown += TxtBox_KeyDown; // Handle Enter key
+
+            this.Controls.Add(txtBox);
+            txtBox.Focus(); // Focus the text box to start typing immediately
+        }
+
+        private void TxtBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                TextBox txtBox = sender as TextBox;
+                if (txtBox != null)
+                {
+                    // Optionally convert this TextBox into a static text (Label) if needed
+                    Label label = new Label();
+                    label.Text = txtBox.Text;
+                    label.Location = txtBox.Location;
+                    label.Font = txtBox.Font;
+                    label.AutoSize = true;
+                    this.Controls.Remove(txtBox);
+                    this.Controls.Add(label);
+                    txtBox.Dispose();
+
+                    e.SuppressKeyPress = true;  // Prevent ding sound
+                }
+            }
+        }
+
+        private void TxtBox_Leave(object sender, EventArgs e)
+        {
+            TextBox txtBox = sender as TextBox;
+            if (txtBox != null)
+            {
+                // Convert the TextBox into a static text (Label) if needed
+                Label label = new Label();
+                label.Text = txtBox.Text;
+                label.Location = txtBox.Location;
+                label.Font = txtBox.Font;
+                label.AutoSize = true;
+                this.Controls.Remove(txtBox);
+                this.Controls.Add(label);
+                txtBox.Dispose();
+            }
+        }
+
 
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
             base.OnMouseDown(e);
+            if (isTextAnnotationMode)
+            {
+                CreateTextBoxAtLocation(e.Location);
+                isTextAnnotationMode = false; // Reset or keep it true if you want to add multiple annotations
+            }
 
             if (isCreateMode)
             {
